@@ -201,7 +201,7 @@ class DistinguishedFolderIdNameType extends Enumeration
      *
      * @var string
      */
-    const JUNK = 'jußnkemail';
+    const JUNK = 'junkemail';
 
     /**
      * Represents the local failures folder.
