@@ -27,7 +27,7 @@ class UpdateInboxRulesRequestType extends BaseRequestType
      *
      * @since Exchange 2010
      *
-     * @var EWSType_ArrayOfRuleOperationsType
+     * @var \jamesiarmes\PhpEws\ArrayType\ArrayOfRuleOperationsType
      */
     public $Operations;
 
