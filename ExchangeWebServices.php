@@ -60,6 +60,41 @@ class ExchangeWebServices
     const VERSION_2010_SP2 = 'Exchange2010_SP2';
 
     /**
+     * Microsoft Exchange 2010 SP2
+     *
+     * @var string
+     */
+    const VERSION_2013 = 'Exchange2013';
+
+    /**
+     * Microsoft Exchange 2010 SP2
+     *
+     * @var string
+     */
+    const VERSION_2016 = 'Exchange2016';
+
+    /**
+     * Constant for a failure sending a request to Exchange
+     *
+     */
+    const EXCHANGE_COMMS_SEND_FAIL = 1000;
+
+    /**
+     * Constant for a general error with Exchange Communication
+     */
+    const EXCHANGE_COMMS_GENERAL_FAIL = 500;
+
+    /**
+     * Constant for Exchange Communication - usually indicating a problem with User Credentials
+     */
+    const EXCHANGE_COMMS_CREDENTIALS_FAIL = 401;
+
+    /**
+     * Constant for Exchange Communication - usually indicating a problem communicating with the domain.
+     */
+    const EXCHANGE_COMMS_DOMAIN_FAIL = 404;
+
+    /**
      * Password to use when connecting to the Exchange server.
      *
      * @var string
@@ -93,6 +128,29 @@ class ExchangeWebServices
      * @var EWSType_ExchangeImpersonationType
      */
     protected $impersonation;
+
+	/**
+	 * Exchange Cookie (if available)
+	 * A Cookie is used (if available) to ensure that when communicating with a cluster of exchange servers, communication always goes back to the same CAS.
+	 *
+	 * @var string
+	 */
+	protected $cookie;
+    /**
+     * Expiry of a Exchange Cookie - used to determine when to stop using a Cookie.
+     *
+     * @var datetime
+     */
+	protected $cookie_expires;
+
+    /**
+     * Set the CURL Method initially to NTLM.
+     * The corresponding NTLMSoapClient will switch to Basic Authentication if NTLM fails. (This is noticeable on Office365)
+     *
+     * @var int
+     * @see NTLMSoapClient::__doRequest
+     */
+	protected $curlauth_method = CURLAUTH_NTLM;
 
     /**
      * Miscrosoft Exchange version that we are going to connect to
@@ -168,9 +226,23 @@ class ExchangeWebServices
      */
     public function setServer($server)
     {
+
+        // If the server is only the servername, then prefix & suffix it with the below, to make a full Exchange server address.
+        // Without this, it's not possible to set a differing paths for those that are proxying their Exchange servers.
+        if(preg_match('#^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$#', $server))
+            $server = 'https://'.$server.'/EWS/Exchange.asmx';
+
         $this->server = $server;
 
         return true;
+    }
+
+    /**
+     * Retrieves the current server - use if you have autodiscovered a server and want to store the results.
+     * @return string
+     */
+    public function getServer(){
+        return $this->server;
     }
 
     /**
@@ -186,6 +258,15 @@ class ExchangeWebServices
     }
 
     /**
+     * Retrieves the current Username - use if you have autodiscovered and you need to check the username
+     * This is done as it's possible that the username and the email address are not the same.
+     * @return string
+     */
+    public function getUsername(){
+        return $this->username;
+    }
+
+    /**
      * Sets the version property.
      *
      * @param string $version
@@ -195,6 +276,22 @@ class ExchangeWebServices
         $this->version = $version;
 
         return true;
+    }
+
+	/**
+	 * Sets the exchange cookie (if it exists)
+	 *
+	 * @param array $cookie
+	 */
+    public function setExchangeCookie($cookie_value, $cookie_expires){
+
+	    $this->initializeSoapClient();
+	    $this->cookie = $cookie_value;
+	    $this->cookie_expires = $cookie_expires;
+	    $this->soap->setExchangeCookie($cookie_value, $cookie_expires);
+
+	    return true;
+
     }
 
     /**
@@ -1194,10 +1291,15 @@ class ExchangeWebServices
                 'user' => $this->username,
                 'password' => $this->password,
                 'version' => $this->version,
-                'location' => 'https://'.$this->server.'/EWS/Exchange.asmx',
-                'impersonation' => $this->impersonation,
+                'location' => $this->server,
+                'impersonation' => $this->impersonation
             )
         );
+	    $this->soap->setCurlAuth($this->curlauth_method);
+
+	    if(!empty($this->cookie)){
+	    	$this->soap->setExchangeCookie($this->cookie, $this->cookie_expires);
+	    }
 
         return $this->soap;
     }
@@ -1220,7 +1322,24 @@ class ExchangeWebServices
         if ($code != 200) {
             throw new EWS_Exception('SOAP client returned status of '.$code, $code);
         }
+        $this->cookie = $this->soap->getExchangeCookie();
+        $this->cookie_expires = $this->soap->getExchangeCookieExpires();
+	    $this->curlauth_method = $this->soap->getCurlAuth();
 
         return $response;
     }
+
+    public function getExchangeCookie(){
+
+	    return $this->cookie = $this->soap->getExchangeCookie();
+
+    }
+
+
+	public function getExchangeCookieExpires(){
+
+		return $this->cookie_expires = $this->soap->getExchangeCookieExpires();
+
+	}
+
 }
