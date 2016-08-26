@@ -330,6 +330,15 @@ class EWSAutodiscover
                 default:
                     return ExchangeWebServices::VERSION_2010;
             }
+        } elseif ($majorversion == 15) {
+	        switch ($minorversion) {
+		        case 0:
+			        return ExchangeWebServices::VERSION_2013;
+			        break;
+		        case 1:
+			        return ExchangeWebServices::VERSION_2016;
+		        	break;
+	        }
         }
 
         // Guess we didn't find a known version.
@@ -350,7 +359,7 @@ class EWSAutodiscover
         }
 
         // Discovery not successful.
-        if ($this->discovered === false) {
+        if ($this->discovered === false||is_null($this->discovered)) {
             return false;
         }
 
@@ -568,7 +577,7 @@ class EWSAutodiscover
         $ch = curl_init();
         $opts = array(
             CURLOPT_URL             => $url,
-            CURLOPT_HTTPAUTH        => CURLAUTH_NTLM,
+            CURLOPT_HTTPAUTH        => CURLAUTH_NTLM | CURLAUTH_BASIC,
             CURLOPT_CUSTOMREQUEST   => 'POST',
             CURLOPT_POSTFIELDS      => $this->getAutoDiscoverRequest(),
             CURLOPT_RETURNTRANSFER  => true,
@@ -631,6 +640,10 @@ class EWSAutodiscover
 
         if (isset($response['Error'])) {
             $this->error = $response['Error'];
+            return false;
+        }
+
+        if(!isset($response['Account']['Action'])){
             return false;
         }
 
