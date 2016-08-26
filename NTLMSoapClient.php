@@ -41,7 +41,18 @@ class NTLMSoapClient extends SoapClient
      *
      * @var boolean
      */
-    protected $validate = false;
+    protected $validate = true;
+
+	/**
+	 * String to hold the exchange cookie value
+	 *
+	 * @var string $cookie
+     */
+    protected $cookie = null;
+    protected $cookie_expires = null;
+
+    private $curlhttp_auth = CURLAUTH_NTLM;
+    protected $last_http_code = null;
 
     /**
      * Performs a SOAP request
@@ -65,6 +76,10 @@ class NTLMSoapClient extends SoapClient
             'SOAPAction: "'.$action.'"',
         );
 
+	    if(!empty($this->cookie)){
+				$headers[] = sprintf("Cookie: exchangecookie=%s", $this->cookie);
+	    }
+
         $this->__last_request_headers = $headers;
         $this->ch = curl_init($location);
 
@@ -75,22 +90,78 @@ class NTLMSoapClient extends SoapClient
         curl_setopt($this->ch, CURLOPT_POST, true );
         curl_setopt($this->ch, CURLOPT_POSTFIELDS, $request);
         curl_setopt($this->ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-        curl_setopt($this->ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC | CURLAUTH_NTLM);
+        curl_setopt($this->ch, CURLOPT_HTTPAUTH,  $this->curlhttp_auth);
         curl_setopt($this->ch, CURLOPT_USERPWD, $this->user.':'.$this->password);
+        curl_setopt($this->ch, CURLOPT_HEADER, true);
 
-        $response = curl_exec($this->ch);
+	    // If our queries cross the threshold for the CAS throttling, well get no response back from Exchange
+	    // So we will wait for 60 seconds (most throttling is done on a minute basis) and then try again.
+	    // We allow this to be done twice.
 
-        // TODO: Add some real error handling.
-        // If the response if false than there was an error and we should throw
+	    $loop_count = 0;
+	      	do {
+			      $loop_count ++;
+	      		$response = curl_exec($this->ch);
+			      if($response!==false&&$this->curlhttp_auth==CURLAUTH_NTLM&&curl_getinfo($this->ch, CURLINFO_HTTP_CODE)=='401'){
+							curl_setopt($this->ch, CURLOPT_HTTPAUTH,  CURLAUTH_BASIC);
+				      $response = curl_exec($this->ch);
+				      if($response!==false&&curl_getinfo($this->ch, CURLINFO_HTTP_CODE)!='401')
+				      	$this->curlhttp_auth = CURLAUTH_BASIC;
+			      }
+			      if($response===false) {
+				      sleep(60);
+			      }
+		      } while($response === false && $loop_count<3);
+
+        // If the response if false than there was an error and we throw
         // an exception.
-        if ($response === false) {
-            throw new EWS_Exception(
-              'Curl error: ' . curl_error($this->ch),
-              curl_errno($this->ch)
-            );
-        }
+        $this->last_http_code = curl_getinfo($this->ch, CURLINFO_HTTP_CODE);
+	    		if ($response === false) {
+				    $message[] = "Failed to send command to Exchange Server.";
+				    $message[] = print_r(curl_getinfo($this->ch),true);
+				    $message[] = curl_error($this->ch);
+				    $message[] = print_r($headers, true);
+				    $message[] = print_r($request,true);
+                    $message[] = curl_getinfo($this->ch, CURLINFO_HTTP_CODE);
+				    throw(new EWS_Exception(implode("\r\n",$message), curl_errno($this->ch)));
+			    } else {
+				    switch (curl_getinfo($this->ch, CURLINFO_HTTP_CODE)) {
+					    case 0:
+						    throw(new EWS_Exception("Failed to send command to Exchange Server", ExchangeWebServices::EXCHANGE_COMMS_SEND_FAIL));
+						    break;
+					    case 401:
+						    throw(new EWS_Exception("Username/Password Problem", ExchangeWebServices::EXCHANGE_COMMS_CREDENTIALS_FAIL));
+						    break;
+					    case 404:
+						    throw(new EWS_Exception("Domain Problem?", ExchangeWebServices::EXCHANGE_COMMS_DOMAIN_FAIL));
+						    break;
+				    }
+			    }
 
-        return $response;
+	    $curl_header_size = curl_getinfo($this->ch, CURLINFO_HEADER_SIZE);
+	    $response_headers = substr($response, 0, $curl_header_size);
+
+	    // Look for the exchange cookie and use it if found.
+	    if (preg_match('/\r\nSet-Cookie:(.+)\r\n/', $response_headers, $matches)) {
+		    foreach (explode(";", $matches[1]) AS $v) {
+			    $v = trim($v); // trim - might break some things, but shouldn't!
+			    if (FALSE !== ($ti = strpos($v, "="))) {
+				    $key = substr($v, 0, $ti++);
+				    $value = substr($v, $ti);
+				    switch ($key) {
+					    case "exchangecookie":
+						    $this->cookie = $value;
+						    break;
+					    case "expires";
+						    $this->cookie_expires = strftime('%Y-%m-%d %H:%M', strtotime($value));
+						    break;
+				    }
+			    }
+		    }
+	    }
+
+	    $response = trim(substr($response, $curl_header_size));
+	    return preg_replace(array("/>&#x[0-9];/", "/&#x[0-9];/"), array(">", " "), $response);
     }
 
     /**
@@ -105,6 +176,11 @@ class NTLMSoapClient extends SoapClient
         return implode('n', $this->__last_request_headers) . "\n";
     }
 
+    public function __getLastHTTPCode()
+    {
+        return $this->last_http_code;
+
+    }
     /**
      * Sets whether or not to validate ssl certificates
      *
@@ -116,4 +192,32 @@ class NTLMSoapClient extends SoapClient
 
         return true;
     }
+
+    public function setExchangeCookie($cookie_value, $cookie_expires){
+
+	    if(!empty($cookie_value)&&!empty($cookie_expires)){
+		    $this->cookie =	(strtotime($cookie_expires)>strtotime("now"))?$cookie_value:null;
+		    $this->cookie_expires = (empty($this->cookie))?null:$cookie_expires;
+	    }
+
+	    return true;
+
+    }
+
+    public function getExchangeCookie(){
+    	return $this->cookie;
+    }
+
+
+	public function getExchangeCookieExpires() {
+		return $this->cookie_expires;
+	}
+
+	public function setCurlAuth($curlauth){
+		$this->curlhttp_auth = $curlauth;
+	}
+
+	public function getCurlAuth(){
+		return $this->curlhttp_auth;
+	}
 }
