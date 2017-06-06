@@ -164,6 +164,10 @@ class ExchangeWebServices
      */
     protected $version;
 
+    protected $verbose = false;
+
+    protected $debug = false;
+
     /**
      * Constructor for the ExchangeWebServices class
      *
@@ -1296,6 +1300,8 @@ class ExchangeWebServices
             )
         );
 	    $this->soap->setCurlAuth($this->curlauth_method);
+	    $this->soap->setSOAPVerbose($this->verbose);
+        $this->soap->setSOAPDebug($this->debug);
 
 	    if(!empty($this->cookie)){
 	    	$this->soap->setExchangeCookie($this->cookie, $this->cookie_expires);
@@ -1341,5 +1347,14 @@ class ExchangeWebServices
 		return $this->cookie_expires = $this->soap->getExchangeCookieExpires();
 
 	}
+
+
+    public function setVerbose($verbose = true){
+        $this->verbose = $verbose?true:false;
+    }
+
+    public function setDebug($debug = true){
+        $this->debug = $debug?true:false;
+    }
 
 }
