@@ -168,6 +168,8 @@ class ExchangeWebServices
 
     protected $debug = false;
 
+    protected $curlSSLValidate = true;
+
     /**
      * Constructor for the ExchangeWebServices class
      *
@@ -1306,6 +1308,9 @@ class ExchangeWebServices
 	    if(!empty($this->cookie)){
 	    	$this->soap->setExchangeCookie($this->cookie, $this->cookie_expires);
 	    }
+	    if(!$this->curlSSLValidate){
+	        $this->soap->setCurlSSLValidate(false);
+        }
 
         return $this->soap;
     }
@@ -1355,6 +1360,9 @@ class ExchangeWebServices
 
     public function setDebug($debug = true){
         $this->debug = $debug?true:false;
+    }
+    public function setCurlSSLValidate($validate = true){
+        $this->curlSSLValidate = $validate;
     }
 
 }

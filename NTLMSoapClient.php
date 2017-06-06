@@ -117,6 +117,10 @@ class NTLMSoapClient extends SoapClient {
             if ($this->debug) {
                 echo "Received HTTP Code: " . curl_getinfo($this->ch, CURLINFO_HTTP_CODE) . PHP_EOL;
                 var_dump($response);
+                if ($this->validate) {
+                    echo "SSL Verify Host: ";
+                    echo curl_getinfo($this->ch, CURLINFO_SSL_VERIFYRESULT) . PHP_EOL;
+                }
             }
             if ($response !== false) {
                 if ($this->curlhttp_auth == CURLAUTH_NTLM &&
@@ -257,6 +261,11 @@ class NTLMSoapClient extends SoapClient {
     public function getCurlAuth()
     {
         return $this->curlhttp_auth;
+    }
+
+    public function setCurlSSLValidate($validate = true)
+    {
+        $this->validate = $validate;
     }
 
     public function setSOAPVerbose($verbose = true)
