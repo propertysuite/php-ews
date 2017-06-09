@@ -25,6 +25,8 @@ class NTLMSoapClient_Exchange extends NTLMSoapClient
      */
     protected $password;
 
+    protected $impersonation = null;
+
     /**
      * Constructor
      *
@@ -41,6 +43,7 @@ class NTLMSoapClient_Exchange extends NTLMSoapClient
         // Set the username and password properties.
         $this->user = $options['user'];
         $this->password = $options['password'];
+        $this->impersonation = null;
 
         // If a version was set then add it to the headers.
         if (!empty($options['version'])) {
@@ -57,6 +60,7 @@ class NTLMSoapClient_Exchange extends NTLMSoapClient
                 'ExchangeImpersonation',
                 $options['impersonation']
             );
+            $this->impersonation = $options['impersonation'];
         }
 
         parent::__construct($wsdl, $options);

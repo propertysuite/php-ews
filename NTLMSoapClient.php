@@ -78,6 +78,10 @@ class NTLMSoapClient extends SoapClient {
             'SOAPAction: "' . $action . '"',
         );
 
+        if(!empty($this->impersonation)){
+            $headers[] = sprintf("X-AnchorMailbox: %s", $this->impersonation->ConnectingSID->PrimarySmtpAddress);
+        }
+
         if (!empty($this->cookie)) {
             $headers[] = sprintf("Cookie: exchangecookie=%s", $this->cookie);
         }
@@ -86,6 +90,8 @@ class NTLMSoapClient extends SoapClient {
             echo "Sending to $location as $this->curlhttp_auth\n";
             echo "Headers to send:\n";
             var_dump($headers);
+            echo "Request:\n";
+            var_dump($request);
         }
 
         $loop_count = 0;
