@@ -64,6 +64,14 @@ class EWSType_DictionaryURIType extends EWSType
      */
     const CONTACTS_PHYSICAL_ADDRESS_COUNTRY = 'contacts:PhysicalAddress:Country';
 
+  /**
+   * Represents the country of a contact.
+   *
+   * @since Exchange 2007
+   *
+   * @var string
+   */
+  const CONTACTS_PHYSICAL_ADDRESS_COUNTRY_OR_REGION = 'contacts:PhysicalAddress:CountryOrRegion';
     /**
      * Represents the postal code of a contact.
      *
